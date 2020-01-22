@@ -84,3 +84,9 @@
        (reduce str)
        ignore-case-eager
        ))
+
+
+(defn user-id-tx [user-id]
+  {:db/id "datomic.tx"
+   :taxonomy-user/id user-id}
+  )

@@ -13,18 +13,34 @@
    [jobtech-taxonomy-api.db.database-connection  :refer :all]
    [jobtech-taxonomy-api.db.api-util :refer :all]
    [jobtech-taxonomy-api.db.concepts :as db-concepts]
+   [clojure.tools.logging :as log]
    ))
 
+(defn- retract-concept-data [user-id id]
+  {:tx-data
+   [(user-id-tx user-id)
+    {:concept/id id
+     :concept/deprecated true}
+    ]}
+  )
 
-(defn retract-concept [id]
-  (let [found-concept (db-concepts/find-concepts-including-unpublished {:id id})]
-    (if (or (= 0 (count found-concept))
-            (get (ffirst found-concept) :concept/deprecated))
-      false
-      (and (d/transact (get-conn) {:tx-data
-                                   [{:concept/id id
-                                     :concept/deprecated true}]})
-           true))))
+(defn- retract-concept-from-database [user-id id]
+  (d/transact (get-conn) (retract-concept-data user-id id))
+  )
+
+(defn concept-already-exists [id]
+  (not (empty? (db-concepts/find-concepts-including-unpublished {:id id})))
+  )
+
+(defn retract-concept [user-id id]
+  (when (concept-already-exists id)
+    (let [result (retract-concept-from-database user-id id)
+          _      (log/info result)
+          ]
+      result
+      )
+    )
+  )
 
 
 (def get-relation-graph-query

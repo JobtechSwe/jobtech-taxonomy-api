@@ -23,11 +23,13 @@
    [jobtech-taxonomy-api.db.search :as search]
    [jobtech-taxonomy-api.db.graph :as graph]
    [jobtech-taxonomy-api.db.core :as core]
+   [jobtech-taxonomy-api.db.daynotes :as daynotes]
    [taxonomy :as types]
    [clojure.tools.logging :as log]
    [clojure.spec.alpha :as s]
    [spec-tools.core :as st]
    [spec-tools.data-spec :as ds]
+   [jobtech-taxonomy-api.routes.parameter-util :as pu]
    ))
 
 ;; Status:
@@ -171,7 +173,7 @@
                         500 {:body types/error-spec}}
             :handler (fn [{{{:keys [edge-relation-type source-concept-type target-concept-type offset limit version]} :query} :parameters}]
                        {:status 200
-                        :body (graph/fetch-graph edge-relation-type source-concept-type target-concept-type offset limit version)})}}]
+                        :body (graph/fetch-graph edge-relation-type source-concept-type target-concept-type offset limit version false)})}}]
 
 
 
@@ -290,11 +292,15 @@
       :delete {:responses {200 {:body types/ok-spec}
                            404 {:body types/error-spec}
                            500 {:body types/error-spec}}
-               :handler (fn [{{{:keys [id]} :query} :parameters}]
+               :handler (fn [request]
                           (log/info "DELETE /concept")
-                          (if (core/retract-concept id)
-                            {:status 200 :body (types/map->nsmap {:message "ok"}) }
-                            {:status 404 :body (types/map->nsmap {:error "not found"}) }))}}]
+                          (let [{:keys [id]} (pu/get-query-from-request  request)
+                                user-id (pu/get-user-id-from-request request)
+                                ]
+
+                            (if (core/retract-concept user-id id)
+                              {:status 200 :body (types/map->nsmap {:message "ok"}) }
+                              {:status 404 :body (types/map->nsmap {:error "not found"}) })))}}]
 
     ["/concept"
      {
@@ -305,51 +311,112 @@
       :post {:responses {200 {:body types/ok-concept-spec}
                          409 {:body types/error-spec}
                          500 {:body types/error-spec}}
-             :handler (fn [{{{:keys [type definition preferred-label]} :query} :parameters}]
-                        (log/info "POST /concept")
-                        (let [[result timestamp new-concept] (concepts/assert-concept type definition preferred-label)]
-                          (if result
-                            {:status 200 :body (types/map->nsmap {:time timestamp :concept new-concept}) }
-                            {:status 409 :body (types/map->nsmap {:error "Can't create new concept since it is in conflict with existing concept."}) })))}}]
+             :handler (fn [request]
+                        (let [{:keys [type definition preferred-label]} (pu/get-query-from-request request)
+                              user-id (pu/get-user-id-from-request request)
+                              ]
+
+                          (log/info "POST /concept" )
+                          (let [[result timestamp new-concept] (concepts/assert-concept user-id type definition preferred-label)]
+                            (if result
+                              {:status 200 :body (types/map->nsmap {:time timestamp :concept new-concept}) }
+                              {:status 409 :body (types/map->nsmap {:error "Can't create new concept since it is in conflict with existing concept."}) }))))}}]
+
+    ["/concepts"
+     {
+      :summary      "Get concepts. Supply at least one search parameter."
+      :parameters {:query
+
+                   (pu/build-parameter-map [:id :preferred-label :type :deprecated :relation :related-ids :offset :limit :version])
+
+
+                   }
+      :get {:responses {200 {:body types/concepts-spec}
+                        500 {:body types/error-spec}}
+            :handler (fn [{{{:keys [id preferred-label type deprecated relation
+                                    related-ids offset limit version]} :query} :parameters}]
+                       (log/info (str "GET private /concepts "
+                                      "id:" id
+                                      " preferred-label:" preferred-label
+                                      " type:" type
+                                      " deprecated:" deprecated
+                                      " related-ids  " related-ids
+                                      " offset:" offset
+                                      " limit:" limit))
+
+                       {:status 200
+                        :body (vec (map types/map->nsmap (concepts/find-concepts-including-unpublished
+                                                          {:id id
+                                                           :preferred-label preferred-label
+                                                           :type (when type (clojure.string/split type #" "))
+                                                           :deprecated deprecated
+                                                           :relation relation
+                                                           :related-ids (when related-ids (clojure.string/split related-ids #" "))
+                                                           :offset offset
+                                                           :limit limit
+                                                           :version version
+                                                           }
+
+                                                          )))})}}]
 
      ["/accumulate-concept"
      {
       :summary      "Accumulate data on an existing concept."
-      :parameters {:query {(ds/opt :id) (taxonomy/par string? "Concept id")
-                           (ds/opt :type) (taxonomy/par string? "Concept type"),
-                           (ds/opt :definition) (taxonomy/par string? "Definition"),
-                           (ds/opt :preferred-label) (taxonomy/par string? "Preferred label")}}
+      :parameters {:query
+                   (pu/build-parameter-map [:id :type :definition :preferred-label])
+                   }
       :patch {:responses {200 {:body types/ok-concept-spec}
                          409 {:body types/error-spec}
                          500 {:body types/error-spec}}
-             :handler (fn [{{{:keys [id type definition preferred-label]} :query} :parameters}]
-                        (log/info "PATCH /accumulate-concept")
-                        (let [result (concepts/accumulate-concept id type definition preferred-label)]
-                          (if result
-                            {:status 200 :body (types/map->nsmap result) }
-                            {:status 409 :body (types/map->nsmap {:error "Can't update concept since it is in conflict with existing concept." }) })))}}]
+              :handler (fn [request ]
+                         (let [{:keys [id type definition preferred-label]} (pu/get-query-from-request request)
+                               user-id (pu/get-user-id-from-request request)
+                               ]
+
+                           (log/info "PATCH /accumulate-concept")
+                           (let [result (concepts/accumulate-concept user-id id type definition preferred-label)]
+                             (if result
+                               {:status 200 :body (types/map->nsmap result) }
+                               {:status 409 :body (types/map->nsmap {:error "Can't update concept since it is in conflict with existing concept." }) }))))}}]
 
 
     ["/relation"
      {
       :summary      "Assert a new relation."
-      :parameters {:query {(ds/opt :relation) (taxonomy/par #{"broader" "narrower" "related" "substitutability" } "Relation type"),
-                           (ds/opt :definition) (taxonomy/par string? "Description"),
-                           (ds/opt :concept-1) (taxonomy/par string? "ID of source concept"),
-                           (ds/opt :concept-2) (taxonomy/par string? "ID of target concept"),
-                           (ds/opt :substitutability-percentage) (taxonomy/par int? "You only need this one if the relation is substitutability")
-                           }}
+      :parameters {:query (concepts/assert-relation-query-params)}
       :post {:responses {200 {:body types/msg-spec}
                          409 {:body types/error-spec}
                          500 {:body types/error-spec}}
-             :handler (fn [{{{:keys [relation definition concept-1 concept-2 substitutability-percentage]} :query} :parameters}]
-                        (log/info "POST /relation")
-                        (let [[result new-relation] (concepts/assert-relation concept-1 concept-2 relation definition substitutability-percentage)
-                              _ (log/info new-relation)
-                              ]
-                          (if result
-                            {:status 200 :body (types/map->nsmap {:message "Created relation."}) }
-                            {:status 409 :body (types/map->nsmap {:error "Can't create new relation since it is in conflict with existing relation."}) })))}}]
+             :handler concepts/assert-relation-handler}}]
+
+
+
+     ["/delete-relation"
+     {
+      :summary      "Retract a relation."
+      :parameters {:query (concepts/delete-relation-query-params)}
+      :delete {:responses {200 {:body types/msg-spec}
+                         409 {:body types/error-spec}
+                         500 {:body types/error-spec}}
+               :handler concepts/delete-relation-handler}}]
+
+
+     ["/graph"
+     {:summary "Fetch nodes and edges from the Taxonomies. Only one depth is returned at the time."
+      :parameters {:query {:edge-relation-type (taxonomy/par string? "Edge relation type")
+                           :source-concept-type (taxonomy/par string? "Source nodes concept type")
+                           :target-concept-type (taxonomy/par string? "Target nodes concept type")
+                           (ds/opt :offset) (taxonomy/par int? "Return list offset (from 0)")
+                           (ds/opt :limit) (taxonomy/par int? "Return list limit")
+                           (ds/opt :version) (taxonomy/par int? "Version to search for")
+                           }  }
+      :get {:responses {200 {:body taxonomy/graph-spec}
+                        401 {:body types/unauthorized-spec}
+                        500 {:body types/error-spec}}
+            :handler (fn [{{{:keys [edge-relation-type source-concept-type target-concept-type offset limit version]} :query} :parameters}]
+                       {:status 200
+                        :body (graph/fetch-graph edge-relation-type source-concept-type target-concept-type offset limit version true)})}}]
+
 
     ["/replace-concept"
      {
@@ -379,4 +446,35 @@
                             {:status 200 :body (types/map->nsmap {:message "A new version of the Taxonomy was created."}) }
                             {:status 406 :body (types/map->nsmap {:error (str new-version-id " is not the next valid version id!")}) }
                             )))}}]
+
+
+    ["/concept/automatic-daynotes/"
+     {
+      :summary      "Fetches automatic day notes from a concept id"
+      :parameters {:query {:id (taxonomy/par string? "ID of concept")}}
+      :get {:responses     {200 {:body [ any?  ]}
+                            404 {:body types/error-spec}
+                            500 {:body types/error-spec}}
+            :handler (fn [{{{:keys [id]} :query} :parameters}]
+                       (log/info (str "GET /concepts/automatic-daynotes/" id ))
+                       {:status 200
+                        :body (daynotes/get-automatic-day-notes-for-concept id)
+                        }
+                       )}}]
+
+    ["/relation/automatic-daynotes/"
+     {
+      :summary      "Fetches automatic day notes for relations from a concept id"
+      :parameters {:query {:id (taxonomy/par string? "ID of concept")}}
+      :get {:responses     {200 {:body [ any?  ]}
+                            404 {:body types/error-spec}
+                            500 {:body types/error-spec}}
+            :handler (fn [{{{:keys [id]} :query} :parameters}]
+                       (log/info (str "GET /relations/automatic-daynotes/" id ))
+                       {:status 200
+                        :body (daynotes/get-automatic-day-notes-for-relation id)
+                        }
+                       )}}]
+
+
     ]])

@@ -8,6 +8,9 @@
    [jobtech-taxonomy-api.db.api-util :refer :all]
    [jobtech-taxonomy-api.db.api-util :as api-util]
    [clojure.set :as set]
+   [clojure.tools.logging :as log]
+   [jobtech-taxonomy-api.routes.parameter-util :as pu]
+   [taxonomy :as types]
    ))
 
 (comment
@@ -314,7 +317,7 @@
 
 (defn find-concepts-by-db
   ([args]
-   (let [ result (d/q (fetch-concepts args))
+   (let [result (d/q (fetch-concepts args))
          parsed-result (parse-find-concept-datomic-result result)]
      parsed-result
      ))
@@ -324,33 +327,36 @@
    (d/q (fetch-relations args)))
 
 ;;add extra-concept-fields to pull pattern
-
 (defn add-find-concepts-args [args]
   (let [pull-pattern (if (:extra-pull-fields args)
                       (concat concept-pull-pattern (:extra-pull-fields args))
                       concept-pull-pattern
                       )
-        db (if (:version args)
-             (get-db (:version args))
-             (get-db))]
+        ]
     (-> args
-        (assoc :db db)
         (assoc :pull-pattern pull-pattern)
         )))
 
 (defn find-concepts
   "Supply version: Use nil as value to get the latest published database."
   [args]
-  #_{:pre [(every? #(contains? args %) [:version :preferred-label])
-           ]}
-  (println args) ;; TODO clean println
-  (find-concepts-by-db (add-find-concepts-args args)))
+  (-> args
+      add-find-concepts-args
+      (assoc :db (get-db (:version args)))
+      find-concepts-by-db
+      )
+  )
 
-;;"TODO expose this as a private end point for the editor"
 (defn find-concepts-including-unpublished [args]
-  (find-concepts-by-db (add-find-concepts-args args)))
+  (-> args
+      add-find-concepts-args
+      (assoc :db (get-db)) ;; impure!
+      find-concepts-by-db
+      )
+  )
 
 
+;; TODO FIX get db som innehåller unpublished sätt db innan! i args
 (defn add-find-relations-args [args]
   (let [pull-pattern relation-pull-pattern
         db (if (:version args)
@@ -398,22 +404,27 @@
   "The response schema for /concepts. Beta for v0.9."
   [concept-schema ])
 
-(defn assert-concept-part [type desc preferred-label]
+
+
+(defn assert-concept-part [user-id type desc preferred-label]
   (let* [new-concept {:concept/id (nano/generate-new-id-with-underscore)
                       :concept/definition desc
                       :concept/type type
                       :concept/preferred-label preferred-label
                       }
 
-         tx        [ new-concept]
-         result     (d/transact (get-conn) {:tx-data tx})]
-         [result new-concept]))
+         tx        [(api-util/user-id-tx user-id) new-concept ]
+         result     (d/transact (get-conn) {:tx-data tx})
+         _          (log/info result)
+         ]
 
-(defn assert-concept "" [type desc preferred-label]
+    [result new-concept]))
+
+(defn assert-concept "" [user-id type desc preferred-label]
   (let [existing (find-concepts-including-unpublished {:preferred-label preferred-label :type type})]
     (if (> (count existing) 0)
       [false nil]
-      (let [[result new-concept] (assert-concept-part type desc preferred-label)
+      (let [[result new-concept] (assert-concept-part user-id type desc preferred-label)
             timestamp (if result (nth (first (:tx-data result)) 2) nil)]
         [result timestamp  new-concept]))))
 
@@ -425,7 +436,9 @@
     (when (> (count response) 0)
       (ffirst response))))
 
-(defn assert-relation-part [c1 c2 type desc substitutability-percentage]
+
+;; CREATE RELATION
+(defn assert-relation-part [user-id c1 c2 type desc substitutability-percentage]
   (let* [new-rel (cond->
                      {:relation/concept-1 c1
                       :relation/concept-2 c2
@@ -439,16 +452,107 @@
                    (assoc :relation/substitutability-percentage substitutability-percentage)
                    )
 
-         tx        [ new-rel]
-         result     (d/transact (get-conn) {:tx-data tx})]
+         tx        [ new-rel  {:db/id "datomic.tx" :taxonomy-user/id user-id}]
+         result     (d/transact (get-conn) {:tx-data tx})
+         _ (println result)
+         ]
+
          [result new-rel]))
 
-(defn assert-relation "" [concept-1 concept-2 type description substitutability-percentage]
+(defn assert-relation "" [user-id concept-1 concept-2 type description substitutability-percentage]
   (let [existing (find-relations-including-unpublished {:concept-1 concept-1 :concept-2 concept-2 :type type})]
     (if (> (count existing) 0)
       [false nil]
-      (assert-relation-part (concept-to-entity concept-1) (concept-to-entity concept-2) type description substitutability-percentage)
+      (assert-relation-part user-id (concept-to-entity concept-1) (concept-to-entity concept-2) type description substitutability-percentage)
       )))
+
+
+
+(defn assert-relation-query-params []
+  (pu/build-parameter-map [:relation-type
+                           :concept-1
+                           :concept-2
+                           :definition
+                           :substitutability-percentage])
+  )
+
+(defn assert-relation-handler [request]
+  (let [{:keys
+         [relation-type
+          definition
+          concept-1
+          concept-2
+          substitutability-percentage]} (pu/get-query-from-request request)
+         user-id (pu/get-user-id-from-request request)
+        ]
+    (do
+      (log/info "POST /relation")
+      (let [[result new-relation]
+            (assert-relation user-id concept-1 concept-2
+                            relation-type definition substitutability-percentage)]
+        (if result
+          {:status 200 :body (types/map->nsmap {:message "Created relation."}) }
+          {:status 409 :body (types/map->nsmap {:error "Can't create new relation since it is in conflict with existing relation."}) })
+        )))
+  )
+
+
+
+
+
+(def fetch-relation-entity-id-query
+  '[:find ?r
+    :in $ ?id-1 ?id-2 ?relation
+    :where
+    [?c1 :concept/id ?id-1]
+    [?r :relation/concept-1 ?c1]
+    [?c2 :concept/id ?id-2]
+    [?r :relation/concept-2 ?c2]
+    [?r :relation/type ?relation]
+    ]
+  )
+
+(defn fetch-relation-entity-id-from-concept-ids-and-relation-type [concept-1 concept-2 relation-type]
+  (ffirst (d/q fetch-relation-entity-id-query (get-db) concept-1 concept-2 relation-type))
+  )
+
+
+
+
+;; DELETE RELATION
+(defn retract-relation [user-id concept-1 concept-2 relation-type]
+  (let [relation-entity-id (fetch-relation-entity-id-from-concept-ids-and-relation-type
+                            concept-1
+                            concept-2
+                            relation-type)
+        result (when relation-entity-id
+                 (d/transact (get-conn) {:tx-data [[:db/retractEntity relation-entity-id]
+                                                   {:db/id "datomic.tx" :taxonomy-user/id user-id}
+                                                   ]}))
+        ]
+    result
+    ))
+
+(defn delete-relation-query-params []
+  (pu/build-parameter-map [ :relation-type :concept-1 :concept-2])
+  )
+
+(defn delete-relation-handler [request]
+  (let [{:keys [user-id relation-type concept-1 concept-2]} (pu/get-query-from-request request)
+        user-id (pu/get-user-id-from-request request)
+        ]
+    (do
+      (log/info (str "DELETE /relation " user-id " " relation-type " " concept-1 " " concept-2))
+      (let [result  (retract-relation user-id concept-1 concept-2 relation-type)]
+        (if result
+          {:status 200 :body (types/map->nsmap {:message "Retracted relation."}) }
+          {:status 400 :body (types/map->nsmap {:error "Relation not found."}) }))
+      )
+    )
+  )
+
+
+
 
 (def fetch-simple-concept-query
   '[:find (pull ?e [:concept/id
@@ -498,7 +602,7 @@
      })
   )
 
-(defn accumulate-concept [id type definition preferred-label]
+(defn accumulate-concept [user-id id type definition preferred-label]
   {:pre [id (or preferred-label definition type)]}
 
   (let [old-concept (fetch-simple-concept id)
@@ -513,7 +617,7 @@
 
         duplicate-exists (duplicate-concept-exists? concept)
         datomic-result (when (not (:result duplicate-exists))
-                 (d/transact (get-conn) {:tx-data [concept]}))
+                         (d/transact (get-conn) {:tx-data [concept (api-util/user-id-tx user-id)]}))
         ]
 
     (when datomic-result

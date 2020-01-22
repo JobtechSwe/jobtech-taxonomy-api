@@ -1,4 +1,4 @@
-{ :datomic-name  "jobtech-taxonomy-henrik-dev-4" ;; "jobtech-taxonomy-development-2019-11-19-1"
+{ :datomic-name "henrik-dev-5" ;;  ;; "jobtech-taxonomy-development-2019-11-19-1" ;;
 :datomic-cfg {
               :server-type :ion
               :region "eu-west-1" ;; e.g. us-east-1
@@ -6,5 +6,7 @@
               ;;:creds-profile "<your_aws_profile_if_not_using_the_default>"
               :endpoint "http://entry.prod-jobtech-taxonomy-db.eu-west-1.datomic.net:8182/"
               :proxy-port 8182}
- :jobtech-taxonomy-api {:auth-tokens {:111 :user :222 :admin} }
+ :jobtech-taxonomy-api {:auth-tokens {:111 :user :222 :admin}
+                        :user-ids {:222 "admin-1"}
+                        }
 }

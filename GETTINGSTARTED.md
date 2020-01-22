@@ -1,10 +1,14 @@
-# JobTech Taxonomy Beta - Getting started
+
+# JobTech Taxonomy - Getting started
+
 
 The Jobtech Taxonomy API gives access to different taxonomies like occupation names, skills and SSYK, SNI etc.      
 
 It’s main purpose is to act as a common language for labour market related systems.
 
-[Jobtech Taxonomy API Swagger UI](https://taxonomy.api.jobtechdev.se/v0/taxonomy/swagger-ui/index.html)
+
+[Jobtech Taxonomy API Swagger UI](https://taxonomy.api.jobtechdev.se/v1/taxonomy/swagger-ui/index.html)
+
 
 In order to use the api you need a key which you need to authenticate yourself.
 
@@ -20,6 +24,10 @@ In order to use the api you need a key which you need to authenticate yourself.
 * [Endpoints](#endpoints)
 * [Results](#results)
 * [Errors](#errors)
+* [Diagrams](#diagrams)
+* [Convert between old and new Taxonomy ids](#convert-between-old-and-new-taxonomy-ids)
+* [Taxonomy + Ontology](#taxonomy--ontology)
+
 
 
 ## Introduction
@@ -59,20 +67,20 @@ This means that version 2 is not fixed for the moment but will be in a future re
 
 1. Follow the instructions on how to get and api key here: [https://apirequest.jobtechdev.se/](https://apirequest.jobtechdev.se/)
 
-2. If you are using curl you have to add the api-key in the headers like this:
-
-    curl "{URL}" -H "accept: application/json" -H "api-key: {YOUR API KEY}"
+2. If you are using curl you have to add the api-key in the headers like this: curl "{URL}" -H "accept: application/json" -H "api-key: {YOUR API KEY}"
 
 3. If you are using the swagger UI you have to log in with the "Authorize" button in the top right corner and add your api-key.
 
-![alt text](swagger-authorize.png "How to log into swagger")
+![text](https://raw.githubusercontent.com/JobtechSwe/jobtech-taxonomy-api/develop/swagger-authorize.png "How to log into swagger")
 
 ## Endpoints
 Below we only show the URLs. If you prefer the curl command, you type it like:
 
-    curl "{URL}" -H "accept: application/json" -H "api-key: {YOUR API KEY}"
+``` 
+curl "{URL}" -H "accept: application/json" -H "api-key: {YOUR API KEY}" 
+```
 
-### Main
+### Main Endpoints
 
 
 
@@ -96,14 +104,14 @@ This endpoint will let you retrieve concepts from different taxonomies.
 
 ##### Example List all Skill headlines
 ```
-http://jobtech-taxonomy-api-develop-jobtech-taxonomy-api.test.services.jtech.se/v1/taxonomy/main/concepts?type=skill-headline
+https://taxonomy.api.jobtechdev.se/v1/taxonomy/main/concepts?type=skill-headline
 ```
 This request will fetch all concepts of type skill headline.
 
 
 ##### Example Relations
 ```
-http://jobtech-taxonomy-api-develop-jobtech-taxonomy-api.test.services.jtech.se/v1/taxonomy/main/concepts?related-ids=xAWr_WYq_JPP%20Uj5W_dft_Ssg&relation=narrower
+https://taxonomy.api.jobtechdev.se/v1/taxonomy/main/concepts?related-ids=xAWr_WYq_JPP%20Uj5W_dft_Ssg&relation=narrower
 
 ```
 This request will fetch concepts that has a narrower relation from the concepts “Databaser” and “Operativsystem”.
@@ -111,7 +119,7 @@ This request will fetch concepts that has a narrower relation from the concepts 
 ##### Example 2. Multiple types
 
 ```
-http://jobtech-taxonomy-api-develop-jobtech-taxonomy-api.test.services.jtech.se/v1/taxonomy/main/concepts?type=ssyk-level-1%20ssyk-level-2%20ssyk-level-3
+https://taxonomy.api.jobtechdev.se/v1/taxonomy/main/concepts?type=ssyk-level-1%20ssyk-level-2%20ssyk-level-3
 ```
 This request will fetch concepts of types ssyk-level-1 ssyk-level-2 and ssyk-level-3
 
@@ -125,9 +133,9 @@ This endpoint will list relations between two types of concepts in the taxonomie
 
 ```
 
-http://jobtech-taxonomy-api-develop-jobtech-taxonomy-api.test.services.jtech.se/v1/taxonomy/main/graph?edge-relation-type=broader&source-concept-type=occupation-name&target-concept-type=ssyk-level-4
+https://taxonomy.api.jobtechdev.se/v1/taxonomy/main/graph?edge-relation-type=broader&source-concept-type=occupation-name&target-concept-type=ssyk-level-4
 
-http://jobtech-taxonomy-api-develop-jobtech-taxonomy-api.test.services.jtech.se/v1/taxonomy/main/graph?edge-relation-type=broader&source-concept-type=ssyk-level-4&target-concept-type=occupation-field
+https://taxonomy.api.jobtechdev.se/v1/taxonomy/main/graph?edge-relation-type=broader&source-concept-type=ssyk-level-4&target-concept-type=occupation-field
 
 
 
@@ -138,7 +146,7 @@ With the help of these two request you can build a tree view bottom up of the oc
 ##### Example Occupation name substitutability
 
 ```
-http://jobtech-taxonomy-api-develop-jobtech-taxonomy-api.test.services.jtech.se/v1/taxonomy/main/graph?edge-relation-type=substitutability&source-concept-type=occupation-name&target-concept-type=occupation-name&limit=10
+https://taxonomy.api.jobtechdev.se/v1/taxonomy/main/graph?edge-relation-type=substitutability&source-concept-type=occupation-name&target-concept-type=occupation-name&limit=10
 ```
 This request will fetch occupation names that has a substitutability relation to each other.
 For example, if an employer wants to hire a  “Barnmorska, förlossning" but can’t find any they can instead use information from this endpoint to search for a "Barnmorska, vårdavdelning/BB-avdelning". The substitutability-percentage will show how well the occupation can substitute another occupation.
@@ -157,10 +165,16 @@ This endpoint will list all deprecated concepts that has been replaced by anothe
 ####  /v1/taxonomy/main/versions
 This endpoint will list all published versions of the taxonomies.
 
-### Specific
+### Specific Endpoints
 These endpoint acts like the  /v1/taxonomy/main/concepts but will also display specific metadata on the concepts like ssyk or country codes.
 
-### Suggesters
+##### Example Fetch SSYK codes for all levels 
+
+```
+https://taxonomy.api.jobtechdev.se/v1/taxonomy/specific/concepts/ssyk?type=ssyk-level-1%20ssyk-level-2%20ssyk-level-3%20ssyk-level-4
+```
+
+### Suggesters Endpoints
 
 #####  /v1/taxonomy/suggesters/autocomplete
 This endpoint is to help end users to find concepts in the taxonomies.
@@ -168,7 +182,7 @@ This endpoint is to help end users to find concepts in the taxonomies.
 ##### Example Autocomplete programming languages starting on “sc”
 
 ```
-http://jobtech-taxonomy-api-develop-jobtech-taxonomy-api.test.services.jtech.se/v1/taxonomy/suggesters/autocomplete?query-string=sc&type=skill&relation=narrower&related-ids=ShQw_McG_oti
+https://taxonomy.api.jobtechdev.se/v1/taxonomy/suggesters/autocomplete?query-string=sc&type=skill&relation=narrower&related-ids=ShQw_McG_oti
 
 
 ```
@@ -180,9 +194,9 @@ With this request you can autocomplete programming languages starting on the let
 
 
 ```
-http://jobtech-taxonomy-api-develop-jobtech-taxonomy-api.test.services.jtech.se/v1/taxonomy/suggesters/autocomplete?query-string=lastb&type=occupation-name%20keyword
+https://taxonomy.api.jobtechdev.se/v1/taxonomy/suggesters/autocomplete?query-string=lastb&type=occupation-name%20keyword
 
-http://jobtech-taxonomy-api-develop-jobtech-taxonomy-api.test.services.jtech.se/v1/taxonomy/main/concepts?related-ids=d68E_e74_a59&relation=related
+https://taxonomy.api.jobtechdev.se/v1/taxonomy/main/concepts?related-ids=d68E_e74_a59&relation=related
 
 
 
@@ -209,3 +223,47 @@ Unsuccessful queries will have a response code of:
 | 400 | Bad Request | Something wrong in the query |
 | 401 | Unauthorized | You are not using a valid API key |
 | 500 | Internal Server Error | Something wrong on the server side |
+
+## Diagrams
+
+Here is a diagram over the types in the taxonomies and what relations they have to eachother.
+The "broader" relation always has an implicit "narrower" relation in the opposite direction.
+The "related" relation always has an implicit "related" relation in the opposite direction.
+
+___
+<!--- The diagrams are generated from the mermaid file taxonomies.mmd ---> 
+![Alt text](https://raw.githubusercontent.com/JobtechSwe/jobtech-taxonomy-api/develop/taxonomy-diagram-part-1.svg?sanitize=true)
+
+___
+
+![Alt text](https://raw.githubusercontent.com/JobtechSwe/jobtech-taxonomy-api/develop/taxonomy-diagram-part-2.svg?sanitize=true)
+
+___
+
+![Alt text](https://raw.githubusercontent.com/JobtechSwe/jobtech-taxonomy-api/develop/taxonomy-diagram-part-3.svg?sanitize=true)
+
+
+## Convert between Old and New Taxonomy ids
+If you need to convert data that contains ids from the old taxonomy service you can use these json-objects to convert between old and new Taxonomy ids.
+
+Convert from old to new json:  
+https://github.com/JobtechSwe/elastic-importers/blob/develop/importers/taxonomy/resources/taxonomy_to_concept.json
+
+Convert from new to old json:  
+https://github.com/JobtechSwe/elastic-importers/blob/develop/importers/taxonomy/resources/concept_to_taxonomy.json
+
+Please be aware of that occupation-group, municipality, region are not using the legacyDatabase id but statistical codes, like SSYK, länskod, kommunkod.
+
+Also note that "driving license", is named "driving licence", in the the new taxonomy API
+
+
+## Taxonomy + Ontology
+
+The Jobmarket Ontology will be merged with the JobTech Taxonomy during 2020.
+The values of the Ontology will become either new concepts, alternative labels or keywords and all identifiers will be replaced with Jobtech Taxonomy identifiers where it's applicable.
+
+
+###  Ontology files
+A file dump of the Ontology can be downloaded here:
+[Ontology Files](https://github.com/JobtechSwe/ontology-files)
+

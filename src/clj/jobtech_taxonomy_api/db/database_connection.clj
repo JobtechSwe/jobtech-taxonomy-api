@@ -58,3 +58,5 @@
 
 (defn get-conn "" []
   (d/connect (get-client)  {:db-name (:datomic-name env)}))
+
+(defn get-db-hist [db] (d/history db))

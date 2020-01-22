@@ -53,7 +53,7 @@
 
 (defn get-tokens-from-env []
   (get-in env [:jobtech-taxonomy-api :auth-tokens])
- )
+  )
 
 (defn valid-keys-from-env []
   (set (keys (get-tokens-from-env)))
@@ -81,3 +81,12 @@
 (defn get-token "i e (get-token :admin)" [token]
   (let [tokens (get-tokens-from-env)]
     (str (clojure.string/replace (first (filter #(= (% tokens) token) (keys tokens))) #":" ""))))
+
+
+(defn get-user-ids-from-env []
+  (get-in env [:jobtech-taxonomy-api :user-ids])
+  )
+
+(defn get-user-id-from-api-key [api-key]
+  (get (get-user-ids-from-env) (keyword api-key))
+  )

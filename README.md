@@ -1,8 +1,8 @@
-# jobtech-taxonomy-api
+# JobTech Taxonomy API
 
-generated using Luminus version "3.10.29"
-
-FIXME
+The JobTech Taxonomy API is a REST API for the [JobTech Taxonomy
+Database][0]. The JobTech Taxonomy Database contains terms or phrases used
+at the Swedish labour market.
 
 ## Prerequisites
 
@@ -10,60 +10,62 @@ You will need [Leiningen][1] 2.0 or above installed.
 
 [1]: https://github.com/technomancy/leiningen
 
-You will also need to install jobtech-taxonomy-database 0.1.0-SNAPSHOT
-in your local repository:
+You will also need a [Datomic][2] database with the JobTech Taxonomy Database installed:
+<https://github.com/JobtechSwe/jobtech-taxonomy-database
 
-    cd <.....>/jobtech-taxonomy-database
-    lein install
+Set your connection details in `env/dev/resources/config.edn`.
 
 ## Running
 
-You can either run from your terminal or from repl
+The project is based on [Luminus][3], which provides the web server
+infrastructure.
 
-## Controlling from Terminal
+You can either run Luminus from either your terminal or from a repl.
 
-Go to project the folder .../jobtech-taxonomy-api
+Regardless of how you start the project, don't forget to start the
+Datomic proxy script first, in case you use Datomic Cloud:
 
-You can either use a web server or a local Datomic.
+    https://docs.datomic.com/cloud/getting-started/connecting.html
+
+### Controlling from Terminal
+
+Change directory to the project root folder.
 
 To start a web server for the application, run this
 to connect to AWS Datomic:
 
-    lein run -p 4444
+    lein run -p 3000
 
 To use a local Datomic, run:
 
-    lein with-profile local run -p 4444
+    lein with-profile local run -p 3000
 
 
-## Controlling from nREPL
+### Controlling from nREPL
 
-Go to project (somewhere in the folder, doesn't matter where, WE THINK) and start your repl (If IntelliJ, dont' forget to  load project in your repl).
+Change to the project root folder and start your repl (If you use IntelliJ,
+don't forget to load the project in your repl).
 
-To start the HTTP server and any other components such as databases, run the start function:
+It is recommended to keep a file `dev-config.edn`, see "CREATE dev-config for local developement below".
 
-    (start-app ["-p" "4444"])
+To start the HTTP server and any other components such as databases,
+run the start function in your repl:
 
-(you can just do _(start)_, but the above command with port number is preferred)
+    (start)
 
-Run the following command to start the HTTP server:
 
-    (mount/start #'jobtech-taxonomy-api.core/http-server)
-
-## NExt step
+## Next step
 Then open the following URL in a web browser:
 
-    http://127.0.0.1:4444/taxonomy/swagger-ui
+    http://localhost:3000/v1/taxonomy/swagger-ui/index.html
+
+## Authorize
+Click the Authorize button, and enter your test account code,
+defined in `env/dev/resources/config.edn`.
 
 ## Running a query
 
-    curl -X GET -H  "api-key: 2f904e245c1f5" --header 'Accept: application/json' 'http://127.0.0.1:4444/taxonomy/public-api/term?term=Danska'
-
-
-## Graph viewer
-
-Load http://127.0.0.1:4444/graphview.html in your web browser.
-
+    curl -X GET --header 'Accept: application/json' --header 'api-key: TEST-ACCOUNT-CODE' 'http://localhost:3000/v1/taxonomy/main/concepts?preferred-label=Danska'
 
 ## Testing
 The integration test setup creates a temporary database for each test,
@@ -79,7 +81,7 @@ Summary:
    tag (e.g. `(test/deftest ^:changes-test-2 changes-test-2 ...)`), and then
    run it with `lein kaocha --focus-meta changes-test-2`.
 
-### Howto write an integration test
+### How to write an integration test
 
 #### File and namespace
 Your test should reside in the directory `test/clj/jobtech_taxonomy_api/test/`.
@@ -211,7 +213,7 @@ The default configuration logs to standard out, and to log files in log/.
 
 ## License
 
-GPLv3
+EPL-2.0
 
 Copyright © 2019 Jobtech
 
@@ -251,3 +253,20 @@ Run the tests (this requires that you have previously setup aws authentication: 
 
 If you get :server-type must be :cloud, :peer-server, or :local
 you have forgot to start luminus. Run (start) in the user> namespace
+
+
+# Contact Information
+
+Bug reports are issued at [https://github.com/JobtechSwe/jobtech-taxonomy-api][the repo on Github].
+
+Questions about the Taxonomy database, about Jobtech, about the API in
+general are best emailed to [contact@jobtechdev.se][Jobtechdev contact
+email adress].
+
+Check out our other open APIs at [jobtechdev][Jobtechdev].
+
+
+[0]: https://github.com/JobtechSwe/jobtech-taxonomy-database "The JobTech Taxonomy Database"
+[1]: https://leiningen.org "Leiningen"
+[2]: https://www.datomic.com "Datomic"
+[3]: http://www.luminusweb.net "Luminus"

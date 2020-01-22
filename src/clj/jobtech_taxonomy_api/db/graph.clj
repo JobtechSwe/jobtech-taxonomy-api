@@ -134,13 +134,13 @@
    }
   )
 
-(defn build-graph-query [relation-type concept-1-type concept-2-type offset limit version]
+(defn build-graph-query [relation-type concept-1-type concept-2-type offset limit version show-unpublished]
   {:pre [relation-type concept-1-type concept-2-type]}
 
   (cond-> initial-graph-query
 
     true
-    (-> (update :args conj (get-db version))
+    (-> (update :args conj (if show-unpublished (get-db) (get-db version)))
         (handle-relations relation-type concept-1-type concept-2-type)
         )
 
@@ -191,7 +191,7 @@
   )
 
 
-(defn fetch-graph [relation-type source-concept-type target-concept-type offset limit version]
+(defn fetch-graph [relation-type source-concept-type target-concept-type offset limit version show-unpublished]
   (reduce db-graph-response-reducer initial-graph-response
-          (d/q (build-graph-query relation-type source-concept-type target-concept-type offset limit version)))
+          (d/q (build-graph-query relation-type source-concept-type target-concept-type offset limit version show-unpublished)))
   )

@@ -11,9 +11,6 @@
    )
   )
 
-(defn get-db-hist [db] (d/history db))
-
-
 (def show-version-instance-ids
   '[:find ?inst ?version
     :in $

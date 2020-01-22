@@ -122,8 +122,6 @@
   )
 
 
-
-
 #_(def show-concept-history-since-transaction-query
   '[:find ?e ?aname ?v ?tx ?added ?concept-id ?term ?pft ?cat
     :in $ ?fromtx
@@ -138,8 +136,6 @@
     ]
   )
 
-
-(defn get-db-hist [db] (d/history db))
 
 (defn group-by-transaction-and-entity [datoms]
   (group-by (juxt #(nth % 3) #(nth % 0)) datoms))
